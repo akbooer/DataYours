@@ -72,6 +72,16 @@
 					}
 				}
 			]
+		},
+		{
+			"Label": {
+				"lang_tag": "advanced",
+				"text": "Advanced"
+			},
+			"Position": "2",
+			"TabType": "javascript",
+			"ScriptName": "shared.js",
+			"Function": "advanced_device"
 		}
 	],
 	"DeviceType": "urn:akbooer-com:device:DataYours:1"
