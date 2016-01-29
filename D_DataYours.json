@@ -54,19 +54,25 @@
 						"Width": 75,
 						"Height": 20
 					}
+				},
+				{
+					"ControlGroup":"2",
+					"ControlType": "label",
+					"top": "4",
+					"left": "0",
+					"Label": {
+						"lang_tag": "donate",
+						"text": "<a href='https:\/\/www.justgiving.com\/DataYours\/' target='_blank'>If you like this plugin, you could DONATE to Cancer Research UK right here</a>"
+					},
+					"Display": {
+						"Top": 120,
+						"Left": 50,
+						"Width": 75,
+						"Height": 20
+					}
 				}
 			]
-		},
-		{
-			"Label": {
-				"lang_tag": "advanced",
-				"text": "Advanced"
-			},
-			"Position": "1",
-			"TabType": "javascript",
-			"ScriptName": "shared.js",
-			"Function": "advanced_device"
-		},
+		}
 	],
 	"DeviceType": "urn:akbooer-com:device:DataYours:1"
 }
