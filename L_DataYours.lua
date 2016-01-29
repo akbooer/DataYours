@@ -152,8 +152,8 @@ function Startup ()
   
   setVar ('Version', _VERSION)              -- code version number
   setVar ('StartTime', os.date())
-  setVar (ALTUI.var1, "no services running", ALTUI.srv)
-  setVar (ALTUI.var2, "no database access", ALTUI.srv)
+  setVar (ALTUI.var1, "no services", ALTUI.srv)
+  setVar (ALTUI.var2, "no database", ALTUI.srv)
 
   local daemons = uiVar ("DAEMONS",   '')           -- eg. "Watch, Cache, Graph, Dash, Mine"
   

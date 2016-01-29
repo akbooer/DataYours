@@ -29,7 +29,7 @@ local function interface (i) return setmetatable (i, {__newindex = method}) end
   -- info
   _AUTHOR       = "@akbooer";
   _COPYRIGHT    = "(c) 2013-2016 AKBooer";
-  _VERSION      = "2016.01.25";
+  _VERSION      = "2016.01.04";
   _DESCRIPTION  = "DataDaemon module for DataYours / Carbon daemons";
 --}
 
@@ -56,7 +56,7 @@ local carbon_conf = {}                          -- global carbon configuration
 -- with thanks to @hek for http://forum.micasaverde.com/index.php/topic,8505.msg93464.html#msg93464
 -- and @guessed for http://forum.micasaverde.com/index.php/topic,23174.msg156990.html#msg156990
 -- this version from: http://forums.coronalabs.com/topic/21105-found-undocumented-way-to-get-your-devices-ip-address-from-lua-socket/
-local function myIP ()    
+function myIP ()    
   local mySocket = socket.udp ()
   mySocket:setpeername ("42.42.42.42", "424242")  -- random IP and PORT
   local ip = mySocket:getsockname () 
@@ -127,7 +127,7 @@ function read_conf_file (path)
     end
     fh:close ()
   else 
-    luup.log ("DataDaemon: unable to open " .. (tostring(path) or '?'))
+    luup.log ("ERROR: unable to open " .. (tostring(path) or '?'))
   end
   return result, index
 end
@@ -139,7 +139,7 @@ end
 --              use fully qualified path names for circular references
 --              improve formatting of isolated nils in otherwise contiguous numeric arrays
 --              improve formatting of nested tables
--- 2016.01.09   fix for {a = false}
+--
 
 function pretty (Lua, name)    -- 2015.11.29   @akbooer
   local con, tab, enc = table.concat, '  ', {}   -- encoded tables (to avoid infinite self-reference loop)
@@ -161,7 +161,7 @@ function pretty (Lua, name)    -- 2015.11.29   @akbooer
       y[i] = nil; its[i] = val (x[i], depth+1, con {name,'[',i,']'}) 
     end
     if #its > 0 then its = {con (its, ',')} end                         -- collapse to single line
-    for i in pairs(y) do idx[#idx+1] = (x[i] ~= nil) and i end          -- sort remaining non-nil indices
+    for i in pairs(y) do idx[#idx+1] = x[i] and i end                   -- sort remaining non-nil indices
     table.sort (idx, function (a,b) return tostring(a) < tostring (b) end)
     for _,j in ipairs (idx) do                                          -- remaining indices
       local fmt_idx = (({string = str_idx})[type(j)] or brk_idx) (j)

@@ -28,7 +28,7 @@ local function interface (i) return setmetatable (i, {__newindex = method}) end
   _COPYRIGHT        = "(c) 2013-2016 AKBooer";
   _DESCRIPTION      = "DataWatcher - Carbon relay daemon";
   _NAME             = "DataWatcher";
-  _VERSION          = "2016.01.25";
+  VERSION          = "2016.01.29";
 --}
 
 local VERA      = DataDaemon.HOST            -- our own hostname
@@ -214,13 +214,14 @@ end
 local function register_AltUI_Data_Storage_Provider ()
   local AltUI
   for devNo, d in pairs (luup.devices) do
-    if d.device_type == "urn:schemas-upnp-org:device:altui:1" then
+    if d.device_type == "urn:schemas-upnp-org:device:altui:1" 
+    and d.device_num_parent == 0 then   -- look for it on the LOCAL machine (might be bridged to another!)
       AltUI = devNo
       break
     end
   end
   if AltUI then 
-    daemon.log ("registing as AltUI [" .. AltUI .. "] as Data Storage Provider")
+    daemon.log ("registering with AltUI [" .. AltUI .. "] as Data Storage Provider")
   else 
     return
   end
@@ -259,7 +260,7 @@ function init ()
   daemon = DataDaemon.start {Name = "DataWatcher", HTTP_callback = HTTPhandler}  
   config = daemon.config
   config.DATAWATCHER = {
-    VERSION = _VERSION, 
+    VERSION = VERSION, 
     watch_tally = watched, 
     relay_tally = relayed,
     translations = translate, 
@@ -271,6 +272,7 @@ function init ()
   syslog = daemon.open_for_syslog (relay.SYSLOG) 
   destinations = daemon.open_for_send (relay.DESTINATIONS)     -- UDP sender: uses [relay] DESTINATIONS
   
+  daemon.log "starting variable watch..."
   local watchlist = wconfig.watch or {}
   if type (watchlist) == "string" then watchlist = {watchlist} end  -- convert string to list
   for _, var in ipairs (watchlist) do 
@@ -278,10 +280,12 @@ function init ()
   end
   
   if relay.LIVE_ENERGY_USAGE == "1" then          -- start watching energy usage
+    daemon.log "starting energy watch..."
     _G.DataEnergyWatcher() 
   end 
   
   if relay.MEMORY_STATS == "1" then               -- start watching memory stats
+    daemon.log "starting memory watch..."
     _G.getSysinfo() 
   end 
   

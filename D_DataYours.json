@@ -1,6 +1,6 @@
 {
-	"flashicon": "icons\/DataYours.png",
-	"default_icon": "DataYours.png",
+	"flashicon":    "http:\/\/raw.githubusercontent.com\/akbooer\/DataYours\/master\/icons\/DataYours.png",
+	"default_icon": "http:\/\/raw.githubusercontent.com\/akbooer\/DataYours\/master\/icons\/DataYours.png",
 	"x": "2",
 	"y": "3",
 	"Tabs": [
