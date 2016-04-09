@@ -12,8 +12,14 @@ module ("L_DataWatcher", package.seeall)
 --  &nowatch=devNo.serviceId.variable   stops watching this variable (effective on next restart only)
 --
 
+-- 2016.02.26   use relative URL for render call (works when used remotely)
+-- 2016.04.07   add user-defined processing to filter outgoing metric values
+-- 2016.04.08   add LINE_RECEIVER_PORT for incoming UDP Whisper plaintext messages to relay to DESTINATIONS
+--
+
 local DataDaemon = require "L_DataDaemon"
 local library    = require "L_DataLibrary"
+local user       = require "L_DataUser"     -- user-defined processing
 local json       = library.json()
 
 local function method () error ("undeclared interface element", 2) end
@@ -28,7 +34,7 @@ local function interface (i) return setmetatable (i, {__newindex = method}) end
   _COPYRIGHT        = "(c) 2013-2016 AKBooer";
   _DESCRIPTION      = "DataWatcher - Carbon relay daemon";
   _NAME             = "DataWatcher";
-  VERSION          = "2016.01.29";
+  VERSION           = "2016.04.08";
 --}
 
 local VERA      = DataDaemon.HOST            -- our own hostname
@@ -49,10 +55,22 @@ local relayed = {}                              -- relayed variables
 local syslog                                    -- syslog socket
 local destinations                              -- destinations socket
 
-local function series (dev, srv, var) return ("%03d.%s.%s"): format (dev, srv, var) end
+local function series (dev, srv, var) return ("%03d.%s.%s"): format (dev or 0, srv or '?', var or '?') end
+local function veraSeries (d,s,v) return table.concat ({VERA, series (d,s,v)}, '.') end
 
 -- message in Whisper plaintext format: "path value timestamp"
-local function plaintext (tag, value, time) return ("%s.%s %s %d"): format (VERA, tag, value, time or os.time ()) end
+local function plaintext (tag, value, time) return table.concat ({tag, value, time or os.time ()}, ' ') end
+
+--TODO:  THIS IS NOT RIGHT - the Vera. prefix should not be attached to ALL messages ...
+
+-- pass the outgoing message through any user-defined processing
+-- possibly resulting in none, one, or more actual outgoing messages
+local function relay_message (metric, value, time)
+  for m,v,t in user.run (metric, value, time) do
+    local message = plaintext (m, v, t)
+    destinations: send (message)
+  end
+end
 
 --------
 --
@@ -82,9 +100,8 @@ function _G.getSysinfo ()
     local names = "MemAvail MemFree MemUsed"
     for name in names: gmatch "%w+" do
       memory_stats[name] = info[name]
-      local tag = series (luup.device, "urn:system:serviceId:ProcMeminfo", name)
-      local message = plaintext (tag, info[name], time)
-      destinations: send (message)
+      local tag = veraSeries (luup.device, "urn:system:serviceId:ProcMeminfo", name)
+      relay_message (tag, info[name], time)
     end
   else
     memory_stats.NoMemInfo = "/proc/meminfo data not found"
@@ -99,24 +116,17 @@ function _G.DataEnergyWatcher ()
   local s, e = luup.inet.wget "http://127.0.0.1:3480/data_request?id=live_energy_usage"
   if s == 0 and e then
 --    captures are: dev, name, room, cat, watts
-    for dev, name, _, _, watts in e: gmatch "(%d+)\t(.-)\t(.-)\t(%d+)\t(%d+)" do
+    for dev, name, _, _, wattage in e: gmatch "(%d+)\t(.-)\t(.-)\t(%d+)\t(%d+)" do
       local devNo = tonumber (dev)
-      local watts = tonumber (watts)
+      local watts = tonumber (wattage)
       if devNo and watts then                     -- check that device currently exists
-        local tag = series (devNo, "urn:micasaverde-com:serviceId:EnergyMetering1", "EnergyUsage")
+        local tag = veraSeries (devNo, "urn:micasaverde-com:serviceId:EnergyMetering1", "EnergyUsage")
         local kilowatthours = watts / 60000       -- convert Watt minutes to kWh
-        local message = plaintext (tag, kilowatthours, time)
-        destinations: send (message)
+        relay_message (tag, kilowatthours, time)
         live_energy_usage[tag] = {name, watts}                         -- add energy usage to the log
       end
     end
   end
-end
-
-local function sendWhisperMessage (tag, lul_value_new)
-    local whisperMessage = plaintext (tag, lul_value_new)
-    destinations: send (whisperMessage)
-    syslog: send (whisperMessage) 
 end
 
 -- Watch callback
@@ -125,11 +135,13 @@ _G[CALL] = function (lul_device, lul_service, lul_variable, _, lul_value_new) --
   local tag = series (lul_device, lul_service, lul_variable)
   if watched[tag] then 
     watched[tag] = watched[tag] + 1   -- keep tally
+    local whisperMessage = plaintext (tag, lul_value_new)
+    syslog: send (whisperMessage)       -- SYSLOG receives the update without translation or user-defined processing
     local wildtag = tag: gsub ("^%d+", "*") 
-    if translate[wildtag] then     -- do symbolic name translation
+    if translate[wildtag] then          -- do symbolic name translation for ALL devices (ie. "*", not "%d+")
       lul_value_new = translate[wildtag][lul_value_new] or 'unknown'
     end
-    sendWhisperMessage (tag, lul_value_new)
+    relay_message (veraSeries(lul_device, lul_service, lul_variable), lul_value_new)
   end
 end
 
@@ -178,6 +190,15 @@ local function updateWatch (action, info)
   end
 end
 
+-- UDP callback
+local function UDPhandler (msg, ip) -- incoming Whisper plaintext message for relay to DESTINATIONS
+  local path, value, timestamp = msg: match "(%S+)%s+(%S+)%s*(%S*)"
+  if value then
+    relay_message (path, value, timestamp)
+    relayed[path] = (relayed[path] or 0) + 1   -- keep tally
+  end
+end
+
 -- HTTP callback
 local function HTTPhandler (action, info)        -- called with individual command line name/value pairs 
   local function noop (n,v) return (("Unknown request: %s=%s"): format (n,v or 'nil')) end
@@ -190,22 +211,20 @@ end
 -- HTTP relay with AltUI Data Storage Provider functionality
 function _G.HTTP_DataWatcherRelay (_,x) 
 --  print ("\nDataWatcherRelay\n", DataDaemon.pretty (x))
-  if x.target then
-    local whisperMessage = table.concat ({x.target, x.new, x.lastupdate}, ' ')
-    destinations: send (whisperMessage)
-    return "OK", "text/plain"
-  elseif x.format and x.format:lower() == "altui" then
-    local sysNo, devNo = (x.lul_device or ''): match "(%d+)%-(%d+)"
-    if sysNo == "0" then    -- limit to local devices for the moment (because Vera id needs to be right)
-      local tag = series (tonumber(devNo) or 0, x.lul_service, x.lul_variable)
-      relayed[tag] = (relayed[tag] or 0) + 1   -- keep tally
-      local whisperMessage = plaintext (tag, x.new, tonumber(x.lastupdate))
-      destinations: send (whisperMessage)
-      syslog: send (whisperMessage) 
-      return "OK", "text/plain"
+  local tag = x.target
+  if not tag then     -- we have to work out what it is
+    if x.format and x.format:lower() == "altui" then
+      local sysNo, devNo = (x.lul_device or ''): match "(%d+)%-(%d+)"
+      if sysNo == "0" then    -- limit to local devices for the moment (because Vera id needs to be right)
+        tag = veraSeries (tonumber(devNo) or 0, x.lul_service, x.lul_variable)
+      end
+    else
+      return "Not OK: invalid HTTP relay request", "text/plain"
     end
   end
-  return "Not OK: invalid AltUI relay request", "text/plain"
+  relay_message (tag or '?', x.new, x.lastupdate)
+  relayed[tag] = (relayed[tag] or 0) + 1   -- keep tally
+  return "OK", "text/plain"
 end
 
 -- Initialisation
@@ -220,11 +239,10 @@ local function register_AltUI_Data_Storage_Provider ()
       break
     end
   end
-  if AltUI then 
-    daemon.log ("registering with AltUI [" .. AltUI .. "] as Data Storage Provider")
-  else 
-    return
-  end
+  
+  if not AltUI then return end
+  
+  daemon.log ("registering with AltUI [" .. AltUI .. "] as Data Storage Provider")
   local ip = daemon.ip
   local newJsonParameters = {
     {
@@ -233,7 +251,8 @@ local function register_AltUI_Data_Storage_Provider ()
         label = "Metric Name",
         type = "text"
       },{
-        default = "http://"..ip..":3480/data_request?id=lr_render&target={0}&hideLegend=true&height=250&from=-y",
+--        default = "http://"..ip..":3480/data_request?id=lr_render&target={0}&hideLegend=true&height=250&from=-y",
+        default = "/data_request?id=lr_render&target={0}&hideLegend=true&height=250&from=-y",   -- 2016.02.26
         key = "graphicurl",
         label = "Graphic Url",
         type = "url"
@@ -288,6 +307,11 @@ function init ()
     daemon.log "starting memory watch..."
     _G.getSysinfo() 
   end 
+  
+  local UDP_port = tonumber (relay.LINE_RECEIVER_PORT)    -- start listening for incoming UDP Whisper messages
+  if UDP_port then
+    daemon.open_for_listen (UDP_port, UDPhandler) 
+  end
   
   luup.register_handler ("HTTP_DataWatcherRelay", "DataWatcherRelay")
   register_AltUI_Data_Storage_Provider ()         -- register with AltUI for data storage
