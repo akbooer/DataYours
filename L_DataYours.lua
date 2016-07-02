@@ -4,7 +4,8 @@
 --
 
 -- 2015-12-15   new version - no child devices
-
+-- 2016-04-11   add LINE_RECEIVER_PORT to relay parameters
+-- 2016-04-14   add DATAMINE_DIR to graph parameters
 
 local DataDaemon = require "L_DataDaemon"
 local lfs        = require "lfs"
@@ -12,7 +13,7 @@ local lfs        = require "lfs"
 -- info
 _AUTHOR         = "@akbooer"
 _COPYRIGHT      = "(c) 2015,2016"
-_VERSION        = "2016.01.04"
+_VERSION        = "2016.04.11"
 _DESCRIPTION    = "DataYours parent device for Carbon daemons"
 
 
@@ -36,6 +37,7 @@ local icon = "ICON_PATH"              -- URL path to icons (ie. without /www/ ro
 local mem  = "MEMORY_STATS"           -- relay system memory info
 local sys  = "SYSLOG"                 -- relay data to syslog
 local udp  = "UDP_RECEIVER_PORT"      -- Cache listens on this port (for UDP)
+local line = "LINE_RECEIVER_PORT"     -- relay listens on this port (for UDP)
 local vera = "VERAS"                  -- list of remote Veras
 
 local function log (message)
@@ -120,7 +122,7 @@ local daemonInfo = -- module filename for each daemon
   {
     Watch = "L_DataWatcher",
     Cache = "L_DataCache",
-    Graph = "L_DataGraph",
+    Graph = "L_DataGraphite",   -- TODO: TESTING NEW GRAPHITE_API
     Dash  = "L_DataDash",
     Mine  = "L_DataMineServer",
   }
@@ -164,6 +166,7 @@ function Startup ()
     [dir]  = uiVar (dir,  ""),                      -- location of the Whisper database (eg. /nas/whisper/)
     [erg]  = uiVar (erg,  ''),                      -- relay energy usage if "1"
     [icon] = uiVar (icon, "/cmh/skins/default/img/devices/device_states/"),
+    [line] = uiVar (line, ''),                      -- relay UDP listener port
     [mem]  = uiVar (mem,  ''),                      -- relay system memory usage
     [sys]  = uiVar (sys,  ''),                      -- relay data to syslog, eg. "172.16.42.112:514"
     [udp]  = uiVar (udp,  "2003"),                  -- Cache listens on this port (for UDP)
@@ -178,9 +181,9 @@ function Startup ()
   end
   
   DataDaemon.set_config {                 -- override the carbon config with these sections
-    relay = select {sys, dest, erg, mem},
+    relay = select {sys, dest, erg, mem, line},
     cache = select {udp, dir},
-    graph = select {dir},
+    graph = select {dir, dm},
     dash  = select {vera, dir, dm, icon},
     mine  = select {dm},
   }

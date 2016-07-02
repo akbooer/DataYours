@@ -15,6 +15,7 @@ module ("L_DataWatcher", package.seeall)
 -- 2016.02.26   use relative URL for render call (works when used remotely)
 -- 2016.04.07   add user-defined processing to filter outgoing metric values
 -- 2016.04.08   add LINE_RECEIVER_PORT for incoming UDP Whisper plaintext messages to relay to DESTINATIONS
+--              test with Linux command: nc -u 127.0.0.1 2013 and plaintext message: foo.garp.bung 42
 --
 
 local DataDaemon = require "L_DataDaemon"
@@ -34,7 +35,7 @@ local function interface (i) return setmetatable (i, {__newindex = method}) end
   _COPYRIGHT        = "(c) 2013-2016 AKBooer";
   _DESCRIPTION      = "DataWatcher - Carbon relay daemon";
   _NAME             = "DataWatcher";
-  VERSION           = "2016.04.08";
+  VERSION           = "2016.04.09";
 --}
 
 local VERA      = DataDaemon.HOST            -- our own hostname
@@ -45,23 +46,23 @@ local daemon                        -- our very own daemon
 local relay                         -- our section of the carbon.conf file 
 local config                        -- our own configuration parameters
 local translate                     -- symbolic name to numeric lookup table
+
+local CALL = "DataWatcherCallback"  -- callback name
+
+local watched = {}                  -- set of watched variable tags 
+local relayed = {}                  -- HTTP relayed variables
+local UDP_relayed = {}              -- UDP relayed
 local live_energy_usage = {}        -- latest energy info
 local memory_stats = {}             -- system memory usage
 
-local CALL = "DataWatcherCallback"             -- callback name
-
-local watched = {}                              -- set of watched variable tags 
-local relayed = {}                              -- relayed variables
-local syslog                                    -- syslog socket
-local destinations                              -- destinations socket
+local syslog                        -- syslog socket
+local destinations                  -- destinations socket
 
 local function series (dev, srv, var) return ("%03d.%s.%s"): format (dev or 0, srv or '?', var or '?') end
 local function veraSeries (d,s,v) return table.concat ({VERA, series (d,s,v)}, '.') end
 
 -- message in Whisper plaintext format: "path value timestamp"
 local function plaintext (tag, value, time) return table.concat ({tag, value, time or os.time ()}, ' ') end
-
---TODO:  THIS IS NOT RIGHT - the Vera. prefix should not be attached to ALL messages ...
 
 -- pass the outgoing message through any user-defined processing
 -- possibly resulting in none, one, or more actual outgoing messages
@@ -190,12 +191,12 @@ local function updateWatch (action, info)
   end
 end
 
--- UDP callback
+-- UDP relay: standard Carbon relay of message received on LINE_RECEIVER_PORT
 local function UDPhandler (msg, ip) -- incoming Whisper plaintext message for relay to DESTINATIONS
   local path, value, timestamp = msg: match "(%S+)%s+(%S+)%s*(%S*)"
   if value then
     relay_message (path, value, timestamp)
-    relayed[path] = (relayed[path] or 0) + 1   -- keep tally
+    UDP_relayed[path] = (UDP_relayed[path] or 0) + 1   -- keep tally
   end
 end
 
@@ -210,16 +211,11 @@ end
 
 -- HTTP relay with AltUI Data Storage Provider functionality
 function _G.HTTP_DataWatcherRelay (_,x) 
---  print ("\nDataWatcherRelay\n", DataDaemon.pretty (x))
-  local tag = x.target
-  if not tag then     -- we have to work out what it is
-    if x.format and x.format:lower() == "altui" then
-      local sysNo, devNo = (x.lul_device or ''): match "(%d+)%-(%d+)"
-      if sysNo == "0" then    -- limit to local devices for the moment (because Vera id needs to be right)
-        tag = veraSeries (tonumber(devNo) or 0, x.lul_service, x.lul_variable)
-      end
-    else
-      return "Not OK: invalid HTTP relay request", "text/plain"
+  local tag = x.target      -- supplied target name overrides device.serviceId.variable syntax
+  if not tag then           -- ...we have to work out what it is
+    local sysNo, devNo = (x.lul_device or ''): match "(%d+)%-(%d+)"
+    if sysNo == "0" then    -- limit to local devices for the moment (because Vera id needs to be right)
+      tag = veraSeries (tonumber(devNo), x.lul_service, x.lul_variable)
     end
   end
   relay_message (tag or '?', x.new, x.lastupdate)
@@ -280,8 +276,11 @@ function init ()
   config = daemon.config
   config.DATAWATCHER = {
     VERSION = VERSION, 
-    watch_tally = watched, 
-    relay_tally = relayed,
+    tally = {
+      watched = watched, 
+      HTTP_relayed = relayed,
+      UDP_relayed = UDP_relayed,
+    },
     translations = translate, 
     live_energy_usage = live_energy_usage,
     memory_stats = memory_stats,
@@ -308,8 +307,9 @@ function init ()
     _G.getSysinfo() 
   end 
   
-  local UDP_port = tonumber (relay.LINE_RECEIVER_PORT)    -- start listening for incoming UDP Whisper messages
-  if UDP_port then
+  local UDP_port = tonumber (relay.LINE_RECEIVER_PORT) 
+  if UDP_port then                                -- start listening for incoming UDP Whisper plaintext messages
+    daemon.log ("starting UDP listener on port " .. UDP_port)
     daemon.open_for_listen (UDP_port, UDPhandler) 
   end
   
