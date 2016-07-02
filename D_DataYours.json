@@ -57,6 +57,20 @@
 				},
 				{
 					"ControlGroup":"2",
+					"ControlType": "variable",
+					"top": "4",
+					"left": "0",
+					"Display": {
+						"Service": "urn:akbooer-com:serviceId:DataYours1",
+						"Variable": "Version",
+						"Top": 120,
+						"Left": 50,
+						"Width": 75,
+						"Height": 20
+					}
+				},
+				{
+					"ControlGroup":"2",
 					"ControlType": "label",
 					"top": "4",
 					"left": "0",
@@ -65,7 +79,7 @@
 						"text": "<a href='https:\/\/www.justgiving.com\/DataYours\/' target='_blank'>If you like this plugin, you could DONATE to Cancer Research UK right here</a>"
 					},
 					"Display": {
-						"Top": 120,
+						"Top": 140,
 						"Left": 50,
 						"Width": 75,
 						"Height": 20

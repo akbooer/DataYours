@@ -1,3 +1,12 @@
+
+local ABOUT = {
+  NAME            = "DataYours";
+  VERSION         = "2016.07.02";
+  DESCRIPTION     = "DataYours - parent device for Carbon daemons";
+  AUTHOR          = "@akbooer";
+  COPYRIGHT       = "(c) 2013-2016 AKBooer";
+  DOCUMENTATION   = "",
+}
 ------------------------------------------------------------------------
 --
 -- DataYours - a simple device front-end for the DataDaemons 
@@ -10,20 +19,12 @@
 local DataDaemon = require "L_DataDaemon"
 local lfs        = require "lfs"
 
--- info
-_AUTHOR         = "@akbooer"
-_COPYRIGHT      = "(c) 2015,2016"
-_VERSION        = "2016.04.11"
-_DESCRIPTION    = "DataYours parent device for Carbon daemons"
-
-
 -- thanks to @amg0 for ALTUI update
 local ALTUI = {   -- generic display variables 
   srv = "urn:upnp-org:serviceId:altui1",
   var1 = "DisplayLine1",
   var2 = "DisplayLine2",
 }
-
 
 local DataYoursSID = "urn:akbooer-com:serviceId:DataYours1"
 
@@ -122,7 +123,8 @@ local daemonInfo = -- module filename for each daemon
   {
     Watch = "L_DataWatcher",
     Cache = "L_DataCache",
-    Graph = "L_DataGraphite",   -- TODO: TESTING NEW GRAPHITE_API
+    Graph = "L_DataGraph",
+    API   = "L_DataWebAPI",   -- NEW GRAPHITE_API
     Dash  = "L_DataDash",
     Mine  = "L_DataMineServer",
   }
@@ -152,7 +154,8 @@ function Startup ()
   
   -- get configuration parameters from device variables  
   
-  setVar ('Version', _VERSION)              -- code version number
+  local version = ABOUT.VERSION: sub(3,-1): gsub ("%.0",'.')     -- code version number
+  setVar ('Version', version)
   setVar ('StartTime', os.date())
   setVar (ALTUI.var1, "no services", ALTUI.srv)
   setVar (ALTUI.var2, "no database", ALTUI.srv)
@@ -200,7 +203,7 @@ function Startup ()
   log "...startup complete"
   if dlist: match "%S+" then setVar (ALTUI.var1, dlist, ALTUI.srv) end
   set_failure (0)                             -- 0 = OK, 1 = authorization fail, 2 = fatal error
-  return true, "DataYours", "OK"
+  return true, "OK", ABOUT.NAME
 end
 
 
