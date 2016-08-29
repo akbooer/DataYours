@@ -1,7 +1,6 @@
-
-local ABOUT = {
+ABOUT = {
   NAME            = "DataYours";
-  VERSION         = "2016.07.02";
+  VERSION         = "2016.07.05";
   DESCRIPTION     = "DataYours - parent device for Carbon daemons";
   AUTHOR          = "@akbooer";
   COPYRIGHT       = "(c) 2013-2016 AKBooer";
@@ -15,6 +14,7 @@ local ABOUT = {
 -- 2015-12-15   new version - no child devices
 -- 2016-04-11   add LINE_RECEIVER_PORT to relay parameters
 -- 2016-04-14   add DATAMINE_DIR to graph parameters
+-- 2016.07.02   add new WebAPI module reference (to replace DataGraph in future)
 
 local DataDaemon = require "L_DataDaemon"
 local lfs        = require "lfs"
@@ -125,6 +125,7 @@ local daemonInfo = -- module filename for each daemon
     Cache = "L_DataCache",
     Graph = "L_DataGraph",
     API   = "L_DataWebAPI",   -- NEW GRAPHITE_API
+    Web   = "L_DataWebAPI",   -- NEW GRAPHITE_API, alias
     Dash  = "L_DataDash",
     Mine  = "L_DataMineServer",
   }
@@ -154,8 +155,12 @@ function Startup ()
   
   -- get configuration parameters from device variables  
   
-  local version = ABOUT.VERSION: sub(3,-1): gsub ("%.0",'.')     -- code version number
-  setVar ('Version', version)
+  do -- version number
+    local y,m,d = ABOUT.VERSION:match "(%d+)%D+(%d+)%D+(%d+)"
+    local version = ("%d.%d.%d"): format (y%2000,m,d)
+    setVar ('Version', version)
+  end
+  
   setVar ('StartTime', os.date())
   setVar (ALTUI.var1, "no services", ALTUI.srv)
   setVar (ALTUI.var2, "no database", ALTUI.srv)
