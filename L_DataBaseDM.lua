@@ -1,14 +1,35 @@
 module ("L_DataBaseDM", package.seeall)
 
+local LICENSE       = [[
+  Copyright 2016 AK Booer
+
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+]]
+
 ------------------------------------------------------------------------
 --
--- (c) 2013, AK Booer
+-- (c) 2013-2016, AK Booer
 --
 -- dmDB, a simple read-only wrapper for the dataMine database.
 -- database access semantics are loosely modelled on the "Berkeley DB" Core API methods
 -- see: http://www.oracle.com/technetwork/products/berkeleydb/documentation/index.html
 -- and: http://forum.micasaverde.com/index.php/topic,17499.0.html
 --
+
+-- 2013.12.28  baseline
+-- 2016/02/07  Use LuaFileSystem to scan for weekly files rather than opening each one: SO much faster
+
+local lfs = require "lfs"
 
 
 local function method () error ("undeclared interface element", 2) end
@@ -23,7 +44,7 @@ local function interface (i) return setmetatable (i, {__newindex = method}) end
   _AUTHOR           = "@akbooer";
   _COPYRIGHT        = "(c) 2013-2015 AKBooer";
   _NAME             = "DataBaseDM";
-  _VERSION          = "2013.12.28";
+  _VERSION          = "2016.02.07";
   _DESCRIPTION      = "a simple read-only wrapper for the dataMine database";
 --}
 
@@ -179,9 +200,19 @@ function open (self, flags)
       return ("%sdatabase/%s/raw/%s.txt"): format (DB.database, channelId, weekNo)
     end
 
+--    local function scanWeeks ()         -- initialise list of available weekly files
+--      for wn = weeknum (DB.earliest), weeknum ()  do        -- from then until now
+--        mapFile (weekFilename(wn), function (_, wn) weeks [#weeks+1] = wn end, wn)
+--      end
+--      return #weeks
+--    end
+
     local function scanWeeks ()         -- initialise list of available weekly files
-      for wn = weeknum (DB.earliest), weeknum ()  do        -- from then until now
-        mapFile (weekFilename(wn), function (_, wn) weeks [#weeks+1] = wn end, wn)
+      local dir = ("%sdatabase/%s/raw"): format (DB.database, channelId)
+      for file in lfs.dir (dir) do
+        local wn = file: match "^(%d+)%.txt$" 
+        wn = tonumber (wn)
+        if wn then weeks [#weeks+1] = wn end
       end
       return #weeks
     end
@@ -329,7 +360,7 @@ function open (self, flags)
     channelId = key.Id                    -- look directly for channel Id to open
     if not channelId then                 -- otherwise do index lookup with given info
       local found = search (DB.index, key)      
-      if #found ~= 1 then return nil, ("cursor key not found or not unique: %d matches"): format (#found) end
+ -- TODO:     if #found ~= 1 then return nil, ("cursor key not found or not unique: %d matches"): format (#found) end
       channelId = found[1].Id
     end 
     

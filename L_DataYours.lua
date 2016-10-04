@@ -1,10 +1,25 @@
 ABOUT = {
   NAME            = "DataYours";
-  VERSION         = "2016.07.05";
+  VERSION         = "2016.10.04";
   DESCRIPTION     = "DataYours - parent device for Carbon daemons";
   AUTHOR          = "@akbooer";
   COPYRIGHT       = "(c) 2013-2016 AKBooer";
   DOCUMENTATION   = "",
+  LICENSE         = [[
+  Copyright 2016 AK Booer
+
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+]]
 }
 ------------------------------------------------------------------------
 --
@@ -124,8 +139,6 @@ local daemonInfo = -- module filename for each daemon
     Watch = "L_DataWatcher",
     Cache = "L_DataCache",
     Graph = "L_DataGraph",
-    API   = "L_DataWebAPI",   -- NEW GRAPHITE_API
-    Web   = "L_DataWebAPI",   -- NEW GRAPHITE_API, alias
     Dash  = "L_DataDash",
     Mine  = "L_DataMineServer",
   }

@@ -1,5 +1,29 @@
 module ("L_DataGraph", package.seeall)
 
+local ABOUT = {
+  NAME            = "DataGraph";
+  VERSION         = "2016.10.04";
+  DESCRIPTION     = "DataGraph - Graphite Web-app look-alike";
+  AUTHOR          = "@akbooer";
+  COPYRIGHT       = "(c) 2013-2016 AKBooer";
+  DOCUMENTATION   = "",
+  LICENSE       = [[
+  Copyright 2016 AK Booer
+
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+]]
+}
+
 ------------------------------------------------------------------------
 --
 -- DataGraph, lightweight Graphite Web-app look-alike
@@ -9,25 +33,14 @@ module ("L_DataGraph", package.seeall)
 -- see https://graphite.readthedocs.org/en/latest/render_api.html
 --  
 
+-- 2016.04.11   refactoring of svg rendering in advance of Storage Finders
+--              add mixed timebase support: no more "incompatible time axes on multiple graphs"
+-- 2016.04.12   remove legend limit of 5 (thanks @ d55m14, although it will still limit to 10.)
+--              add graphType parameter (also thanks @ d55m14)
+
 local DataDaemon = require "L_DataDaemon"
 local whisper    = require "L_DataWhisper"
 local library    = require "L_DataLibrary"
-
-
-local function method () error ("undeclared interface element", 2) end
-local function interface (i) return setmetatable (i, {__newindex = method}) end
-
-
---local DataGraph = interface {
-  -- functions
-  init              = method;       -- entry point
-  -- info
-  _AUTHOR           = "@akbooer";
-  _COPYRIGHT        = "(c) 2013-2016 AKBooer";
-  _NAME             = "DataGraph";
-  _VERSION          = "2016.01.04";
-  _DESCRIPTION      = "DataGraph - Graphite Web-app look-alike";
---}
 
 
 local daemon                    -- the daemon object with useful methods
@@ -35,10 +48,10 @@ local config                    -- all our configuration (and the .conf file inf
 local graph                     -- our section of the carbon.conf file 
 local ROOT                      -- for the whisper database
 
-local plot  = {cpu = 0, number = 0}
-local fetch = {cpu = 0, number = 0, points = 0}
+local plot  = {cpu = 0, total = 0}
+local fetch = {cpu = 0, total = 0, points = 0}
 
-local stats = { plot = plot, fetch = fetch}                -- interesting performance stats
+local stats = {plot = plot, fetch = fetch}                -- interesting performance stats
 
 local gviz    = library.gviz()
 
@@ -118,13 +131,13 @@ local function get_whisper_data (series, t1, t2)
   if not tv then return "Series not found: " .. (series or '') end
 
   local n = tv.values.n or 0
+  local message  = ("Whisper query: CPU = %.3f mS for %d points"): format (cpu*1e3, n)
   fetch.cpu    = fetch.cpu + (cpu - cpu % 0.001)
-  fetch.number = fetch.number + 1
+  fetch.total = fetch.total + 1
   fetch.points = fetch.points + n
-  fetch.query  = ("Whisper query: CPU = %.3f mS for %d points"): format (cpu*1e3, n)
-  daemon.log (fetch.query)
+  daemon.log (message)
 
-  return tv
+  return tv, message
 end
 
 -------------
@@ -150,6 +163,7 @@ end
 -- 
 -- yMin/yMax: y-axis upper limit
 -- 
+-- graphType: line is default, but otherwise specify any Chart type: BarChart, ColumnChart, ... (not PieChart)
 
 -- return values for "mode" and "zero" plotting modes based on archive or input options
 local function drawingModes (series, options)
@@ -174,13 +188,12 @@ end
 --
 
 local function svgRender (options, t1, t2)
-  -- note: this svg format is missing the embedded metadata object which Graphite includes
+  -- note: this svg format does not include Graphite's embedded metadata object
   local list = {}
   local mode, nulls, zero, hold, stair, slope, connect
   local data = gviz.DataTable ()
   data.addColumn('datetime', 'Time');
   local m, n = 0, 0
-  local firstTimeAxis
   
   local aliases = {}
   if options.aliases then  -- strip out the individual alias names from the command line
@@ -189,8 +202,12 @@ local function svgRender (options, t1, t2)
     end
   end
 
+  -- fetch the data
+  
+  local row = {}   -- rows indexed by time
+  local whisper_stats = {}
   for series in expansions (options.target) do
-    n = n + 1
+   n = n + 1
     if n == 1 then     -- do first-time setup
       mode, nulls = drawingModes (series, options)
       stair   = (mode == "staircase")
@@ -202,34 +219,53 @@ local function svgRender (options, t1, t2)
     end
     list[n] = series
     data.addColumn('number', aliases[n] or series);
-    local tv = get_whisper_data (series, t1, t2)  
-    local timeAxis = table.concat (tv.times, ':')
-    firstTimeAxis = firstTimeAxis or timeAxis
-    if timeAxis ~= firstTimeAxis then return "incompatible time axes on multiple graphs" end
-    m = tv.values.n
-
-    local j = 0
-    local previous
+    local tv, stats = get_whisper_data (series, t1, t2)  
+    whisper_stats['Q'..n] = stats      -- string() so that the pretty-printed log looks good
+    
+    local current, previous
     for _, v,t in tv:ipairs() do
-      j = j + 1
-      if n == 1 then 
-        if stair then data.addRow {t} end
-        data.addRow {t} 
-      end
-      v = v or (hold and previous) or zero
-      if stair then 
-        data.setValue (j, n+1, previous); j = j + 1 
-      end
-      data.setValue (j, n+1, v) 
-      previous = v 
+      row[t] = row[t] or {t}                        -- create the row if it doesn't exist
+      current = v or (hold and previous) or zero    -- special treatment for nil
+      row[t][n+1] = current                         -- fill in the column
+      previous = current
     end
   end
-
-  local cpu = daemon.cpu_clock ()
+  fetch.query = whisper_stats
+  
+  -- sort the time axes
+  
+  local index = {}
+  for t in pairs(row) do index[#index+1] = t end    -- list all the time values
+  table.sort(index)                                 -- sort them
+  m = #index
+  
+  -- construct the data rows for plotting
+  
+  local previous
+  for _,t in ipairs(index) do
+    if stair and previous then
+      local extra = {}
+      for a,b in pairs (previous) do extra[a] = b end   -- duplicate previous
+      extra[1] = t                                      -- change the time
+      data.addRow (extra)
+    end
+    data.addRow (row[t])
+    previous = row[t]
+  end
+  
+  -- add the options
+  
   local legend = "none"
-  if not options.hideLegend and n < 6 then legend = 'bottom' end
+  if not options.hideLegend then legend = 'bottom' end
   local title = options.title or options.target
-  local opt = {title = title, height = options.height or 500, width = options.width, legend = legend, interpolateNulls = connect, backgroundColor = options.bgcolor}  
+  local opt = {
+    title = title, 
+    height = options.height or 500, 
+    width = options.width, 
+    legend = legend, 
+    interpolateNulls = connect, 
+    backgroundColor = options.bgcolor
+  }  
 
   local clip, vtitle
   if options.yMax or options.yMin then clip = {max = options.yMax, min = options.yMin} end
@@ -239,11 +275,15 @@ local function svgRender (options, t1, t2)
 
   local chartType = "LineChart"
   if options.areaMode and (options.areaMode ~= "none") then chartType = "AreaChart" end
+  chartType = options.graphType or chartType    -- specified value overrides defaults
+  local cpu = daemon.cpu_clock ()
   local chart = gviz.Chart (chartType)
   local status = chart.draw (data, opt)
   cpu = daemon.cpu_clock () - cpu
   plot.cpu = plot.cpu + (cpu - cpu % 0.001)
-  plot.number = plot.number + 1
+  plot.mode = mode
+  plot.nulls = nulls
+  plot.total = plot.total + 1
   plot.render = ("render: CPU = %.3f mS for %dx%d=%d points"): format (cpu*1e3, n, m, n*m)
   daemon.log (plot.render)
   return status
@@ -280,13 +320,15 @@ local function jsonRender (p, t1, t2)
   --  ]
   --}]
   local tv = get_whisper_data (p.target, t1, t2)  
-  local data = {'[{', '  "target": "'..p.target..'"', ',  "datapoints": [' }
-  local timeInfo, valueList = tv.times, tv.values
-  local t, dt, n = timeInfo[1], timeInfo[3], (timeInfo[2]-timeInfo[1]) / timeInfo[3]
+  local data = {
+    '[{',
+    '  "target": "'..p.target..'",',
+    '  "datapoints": ['
+  }
+  local n = tv.values.n or 0
   local nocomma = {[n] = ''}
-  for i = 1, n do
-    data[#data+1] = table.concat {'  [', valueList[i] or 'null', ', ', t, ']', nocomma[i] or ','}
-    t = t + dt
+  for i, v,t in tv:ipairs() do
+    data[#data+1] = table.concat {'  [', v or 'null', ', ', t, ']', nocomma[i] or ','}
   end
   data[#data+1] = '  ]'
   data[#data+1] = '}]'
@@ -314,7 +356,7 @@ end
 
 -- HTTP handler
 
-function _G.HTTP_DataGraphRenderer (lul_request, ...)         -- renderer handler
+function _G.HTTP_DataGraphRenderer (_, ...)         -- renderer handler
   local ok, html = pcall (renderHandler, ...)  -- catch any errors which are reported in the html returned
   if not ok then daemon:error (html) end
   return html
@@ -330,7 +372,7 @@ function init ()
   luup.register_handler ("HTTP_DataGraphRenderer", "grafana/render")     -- for COMPATIBILITY with Grafana
     
   ROOT = graph.LOCAL_DATA_DIR     -- where to look for a database
-  config.DATAGRAPH = {VERSION = _VERSION, whisper = ROOT, stats = stats}
+  config.DATAGRAPH = {VERSION = ABOUT.VERSION, whisper = ROOT, stats = stats}
 end 
 
 ----

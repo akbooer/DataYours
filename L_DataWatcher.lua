@@ -1,5 +1,29 @@
 module ("L_DataWatcher", package.seeall)
 
+local ABOUT = {
+  NAME            = "DataWatcher";
+  VERSION         = "2016.10.04";
+  DESCRIPTION     = "DataWatcher - Carbon Relay daemon";
+  AUTHOR          = "@akbooer";
+  COPYRIGHT       = "(c) 2013-2016 AKBooer";
+  DOCUMENTATION   = "",
+  LICENSE         = [[
+  Copyright 2016 AK Booer
+
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+]]
+}
+
 ------------------------------------------------------------------------
 --
 -- DataWatcher mimics a Carbon "relay" daemon, 
@@ -23,20 +47,7 @@ local library    = require "L_DataLibrary"
 local user       = require "L_DataUser"     -- user-defined processing
 local json       = library.json()
 
-local function method () error ("undeclared interface element", 2) end
-local function interface (i) return setmetatable (i, {__newindex = method}) end
-
-
---local DataWatcher = interface {
-  -- functions
-  init              = method;       -- entry point
-  -- info
-  _AUTHOR           = "@akbooer";
-  _COPYRIGHT        = "(c) 2013-2016 AKBooer";
-  _DESCRIPTION      = "DataWatcher - Carbon relay daemon";
-  _NAME             = "DataWatcher";
-  VERSION           = "2016.04.09";
---}
+--
 
 local VERA      = DataDaemon.HOST            -- our own hostname
 local conf_file = DataDaemon.config_path .. "DataWatcher.conf" 
@@ -193,6 +204,7 @@ end
 
 -- UDP relay: standard Carbon relay of message received on LINE_RECEIVER_PORT
 local function UDPhandler (msg, ip) -- incoming Whisper plaintext message for relay to DESTINATIONS
+  local _ = ip      -- unused at present
   local path, value, timestamp = msg: match "(%S+)%s+(%S+)%s*(%S*)"
   if value then
     relay_message (path, value, timestamp)
@@ -209,7 +221,7 @@ local function HTTPhandler (action, info)        -- called with individual comma
   return html
 end
 
--- HTTP relay with AltUI Data Storage Provider functionality
+---- HTTP relay with AltUI Data Storage Provider functionality
 function _G.HTTP_DataWatcherRelay (_,x) 
   local tag = x.target      -- supplied target name overrides device.serviceId.variable syntax
   if not tag then           -- ...we have to work out what it is
@@ -222,6 +234,38 @@ function _G.HTTP_DataWatcherRelay (_,x)
   relayed[tag] = (relayed[tag] or 0) + 1   -- keep tally
   return "OK", "text/plain"
 end
+
+--[[
+-- 2016.10.04   change DataWatcherRelay HTTP handler to ALWAYS send tagged variables (from AltUI) to 127.0.0.1:2003,
+--              and always use the FULL Vera pathname for everything in the DESTINATIONS list.
+
+local local_UDP
+
+-- HTTP relay with AltUI Data Storage Provider functionality
+function _G.HTTP_DataWatcherRelay (_,x) 
+  local tag = x.target      
+  
+  -- supplied target name so send this locally
+  if tag then
+    if not local_UDP then
+      local_UDP = DataDaemon.open_for_send "127.0.0.1:2003"
+    end
+    if local_UDP then
+      local message = plaintext (tag,  x.new, x.lastupdate)
+      local_UDP: send (message)
+    end
+  end
+  
+  -- usual Vera.device.serviceId.name syntax
+  local sysNo, devNo = (x.lul_device or ''): match "(%d+)%-(%d+)"
+  if sysNo == "0" then    -- limit to local devices for the moment (because Vera id needs to be right)
+    tag = veraSeries (tonumber(devNo), x.lul_service, x.lul_variable)
+  end
+  relay_message (tag or '?', x.new, x.lastupdate)
+  relayed[tag] = (relayed[tag] or 0) + 1   -- keep tally
+  return "OK", "text/plain"
+end
+--]]
 
 -- Initialisation
 
@@ -239,7 +283,6 @@ local function register_AltUI_Data_Storage_Provider ()
   if not AltUI then return end
   
   daemon.log ("registering with AltUI [" .. AltUI .. "] as Data Storage Provider")
-  local ip = daemon.ip
   local newJsonParameters = {
     {
         default = "unknown",
@@ -275,7 +318,7 @@ function init ()
   daemon = DataDaemon.start {Name = "DataWatcher", HTTP_callback = HTTPhandler}  
   config = daemon.config
   config.DATAWATCHER = {
-    VERSION = VERSION, 
+    VERSION = ABOUT.VERSION, 
     tally = {
       watched = watched, 
       HTTP_relayed = relayed,

@@ -1,5 +1,21 @@
 module ("L_DataMineServer", package.seeall)
 
+local LICENSE       = [[
+  Copyright 2016 AK Booer
+
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+]]
+
 ------------------------------------------------------------------------
 --
 -- dmDBserver, modified to run as a DataYours daemon.
@@ -38,7 +54,7 @@ local function interface (i) return setmetatable (i, {__newindex = method}) end
   _AUTHOR           = "@akbooer";
   _COPYRIGHT        = "(c) 2013-2015 AKBooer";
   _NAME             = "DataMineServer";
-  _VERSION          = "2015.07.22";
+  _VERSION          = "2016.02.08";
   _DESCRIPTION      = "DataMineServer - dmDBserver, modified to run as a DataYours daemon";
 --}
 
@@ -252,6 +268,7 @@ local function timeline (options)
       local _, first = dmc:getFirst ()
       local _, last  = dmc:getLast ()
       if first and last then
+        if last <= first then last = first + 1 end
         d.addRow {name, first, last}
       end
       dmc: close ()
