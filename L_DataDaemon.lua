@@ -2,7 +2,7 @@ module ("L_DataDaemon", package.seeall)
 
 local ABOUT = {
   NAME            = "DataDaemon";
-  VERSION         = "2016.07.02";
+  VERSION         = "2016.10.10";
   DESCRIPTION     = "DataDaemon module for DataYours / Carbon daemons";
   AUTHOR          = "@akbooer";
   COPYRIGHT       = "(c) 2013-2016 AKBooer";
@@ -33,13 +33,14 @@ local ABOUT = {
 --
 
 -- 2016.10.04  make UDP open_for_send global (for general use)
+-- 2016.10.10  fix global variables HOST and config_path, mistakenly made local
 
 local socket  = require "socket"
 
 -- constants  
-local HOST = "Vera-" .. luup.pk_accesspoint;         -- our own hostname for syslog
+HOST = "Vera-" .. luup.pk_accesspoint;         -- our own hostname for syslog
   
-local config_path     = "/www/";                    -- config file path
+config_path     = "/www/";                    -- config file path
 
 --  cpu_clock       = method;                     -- CPU clock with wrap-around correction
 --  read_conf_file  = method;                     -- Carbon/Graphite config file reader
