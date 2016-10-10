@@ -4,7 +4,7 @@ module(..., package.seeall)
 
 ABOUT = {
   NAME          = "graphite_cgi",
-  VERSION       = "2016.10.03",
+  VERSION       = "2016.10.10",
   DESCRIPTION   = "Graphite",
   AUTHOR        = "@akbooer",
   COPYRIGHT     = "(c) 2013-2016 AKBooer",
@@ -26,6 +26,7 @@ ABOUT = {
 ]]
 }
 
+-- 2016.10.10  check for blank Whisper or dataMine directories in storage_find
 
 -- CGI implementation of Graphite API
 local url     = require "socket.url"
@@ -537,8 +538,9 @@ local function storage_find (ROOT, MINE)
     
   }
   
-  local Wfinder = finders.whisper.WhisperFinder (config)
-  local Dfinder = finders.datamine.DataMineFinder (config)
+  local Wfinder, Dfinder
+  if ROOT ~= '' then Wfinder = finders.whisper.WhisperFinder (config) end
+  if MINE ~= '' then Dfinder = finders.datamine.DataMineFinder (config) end
   return graphite_api.storage.Store {Wfinder, Dfinder}
 end
 
