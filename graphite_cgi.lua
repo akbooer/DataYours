@@ -27,6 +27,7 @@ ABOUT = {
 }
 
 -- 2016.10.10  check for blank Whisper or dataMine directories in storage_find
+-- 2016.10.20  add context parameter to treejson response (thanks @ronluna)
 
 -- CGI implementation of Graphite API
 local url     = require "socket.url"
@@ -166,7 +167,7 @@ Parameters:
 query (mandatory)
     The query to search for.
 format
-    The output format to use. Can be completer (default) or treejson.
+    The output format to use. Can be completer (default) [AKB: docs are WRONG!] or treejson.
 wildcards (0 or 1)
     Whether to add a wildcard result at the end or no. Default: 0.
 from
@@ -217,8 +218,8 @@ local function unknown (env)
   return "Not Implemented: " .. env.SCRIPT_NAME, 501
 end
 
--- format: The output format to use. Can be completer (default) or treejson.
-  -- TODO: resolve doubt as to which IS the default!  Grafan needs treejson
+-- format: The output format to use. Can be completer (default) [AKB: docs are WRONG!] or treejson.
+  -- 2016.10.20 resolved doubt as to which IS the default!  Grafana needs treejson, it IS treejson
 
 local function treejson (i)
   return {
@@ -227,6 +228,7 @@ local function treejson (i)
     leaf = i.is_leaf and 1 or 0,
     id = i.path,
     text = i.name,
+    context = {},   -- seems to be required, but don't know what it does!
     }
 end
 
@@ -251,11 +253,12 @@ local function metrics_find (_, p)
   
   local formatter
   local format_options = {completer = completer, treejson = treejson}
-  formatter = format_options[p.format or ''] or completer
+  formatter = format_options[p.format or ''] or treejson  -- 2016.10.20  change default format
   
   for i in storage.find (query) do metrics[#metrics+1] = formatter (i) end
   
-  return jsonify ({metrics = metrics}, 200,  nil, p.jsonp)
+  if formatter == completer then metrics = {metrics = metrics} end    -- 2016.10.20
+  return jsonify (metrics, 200,  nil, p.jsonp)
 end
 
 local function metrics_expand (_, p)
