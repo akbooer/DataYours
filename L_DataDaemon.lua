@@ -1,5 +1,29 @@
 module ("L_DataDaemon", package.seeall)
 
+local ABOUT = {
+  NAME            = "DataDaemon";
+  VERSION         = "2016.10.10";
+  DESCRIPTION     = "DataDaemon module for DataYours / Carbon daemons";
+  AUTHOR          = "@akbooer";
+  COPYRIGHT       = "(c) 2013-2016 AKBooer";
+  DOCUMENTATION   = "",
+  LICENSE       = [[
+  Copyright 2016 AK Booer
+
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+]]
+}
+
 ------------------------------------------------------------------------
 --
 -- DataDaemon: a generic framework for Graphite Carbon daemons
@@ -8,31 +32,23 @@ module ("L_DataDaemon", package.seeall)
 -- UDP datagrams are all in Whisper plaintext format
 --
 
+-- 2016.10.04  make UDP open_for_send global (for general use)
+-- 2016.10.10  fix global variables HOST and config_path, mistakenly made local
+
 local socket  = require "socket"
 
+-- constants  
+HOST = "Vera-" .. luup.pk_accesspoint;         -- our own hostname for syslog
+  
+config_path     = "/www/";                    -- config file path
 
-local function method () error ("undeclared interface element", 2) end
-local function interface (i) return setmetatable (i, {__newindex = method}) end
-
-
---local DataDaemon = interface {
-  -- constants  
-  HOST = "Vera-" .. luup.pk_accesspoint;         -- our own hostname for syslog
-  -- variables
-  config_path     = "/www/";                    -- config file path
-  -- methods
-  cpu_clock       = method;                     -- CPU clock with wrap-around correction
-  read_conf_file  = method;                     -- Carbon/Graphite config file reader
-  pretty          = method;                     -- Lua pretty-printer
-  set_config      = method;                     -- override config file reading
-  start           = method;                     -- start a new daemon
-  -- info
-  _AUTHOR       = "@akbooer";
-  _COPYRIGHT    = "(c) 2013-2016 AKBooer";
-  _VERSION      = "2016.01.04";
-  _DESCRIPTION  = "DataDaemon module for DataYours / Carbon daemons";
---}
-
+--  cpu_clock       = method;                     -- CPU clock with wrap-around correction
+--  read_conf_file  = method;                     -- Carbon/Graphite config file reader
+--  pretty          = method;                     -- Lua pretty-printer
+--  set_config      = method;                     -- override config file reading
+--  start           = method;                     -- start a new daemon
+ 
+ 
 local carbon_conf = {}                          -- global carbon configuration
 
 ------------------------------------------------------------------------
@@ -56,7 +72,7 @@ local carbon_conf = {}                          -- global carbon configuration
 -- with thanks to @hek for http://forum.micasaverde.com/index.php/topic,8505.msg93464.html#msg93464
 -- and @guessed for http://forum.micasaverde.com/index.php/topic,23174.msg156990.html#msg156990
 -- this version from: http://forums.coronalabs.com/topic/21105-found-undocumented-way-to-get-your-devices-ip-address-from-lua-socket/
-function myIP ()    
+local function myIP ()    
   local mySocket = socket.udp ()
   mySocket:setpeername ("42.42.42.42", "424242")  -- random IP and PORT
   local ip = mySocket:getsockname () 
@@ -127,7 +143,7 @@ function read_conf_file (path)
     end
     fh:close ()
   else 
-    luup.log ("ERROR: unable to open " .. (tostring(path) or '?'))
+    luup.log ("DataDaemon: unable to open " .. (tostring(path) or '?'))
   end
   return result, index
 end
@@ -139,7 +155,7 @@ end
 --              use fully qualified path names for circular references
 --              improve formatting of isolated nils in otherwise contiguous numeric arrays
 --              improve formatting of nested tables
---
+-- 2016.01.09   fix for {a = false}
 
 function pretty (Lua, name)    -- 2015.11.29   @akbooer
   local con, tab, enc = table.concat, '  ', {}   -- encoded tables (to avoid infinite self-reference loop)
@@ -161,7 +177,7 @@ function pretty (Lua, name)    -- 2015.11.29   @akbooer
       y[i] = nil; its[i] = val (x[i], depth+1, con {name,'[',i,']'}) 
     end
     if #its > 0 then its = {con (its, ',')} end                         -- collapse to single line
-    for i in pairs(y) do idx[#idx+1] = x[i] and i end                   -- sort remaining non-nil indices
+    for i in pairs(y) do idx[#idx+1] = (x[i] ~= nil) and i end          -- sort remaining non-nil indices
     table.sort (idx, function (a,b) return tostring(a) < tostring (b) end)
     for _,j in ipairs (idx) do                                          -- remaining indices
       local fmt_idx = (({string = str_idx})[type(j)] or brk_idx) (j)
@@ -186,7 +202,7 @@ end
 
 -- UDP utility methods
 
-local function open_for_send (ip_and_port)   -- returns socket configured for sending to given destination
+function open_for_send (ip_and_port)   -- returns socket configured for sending to given destination
   local sock, msg, ok
   local ip, port = ip_and_port: match "(%d+%.%d+%.%d+%.%d+):(%d+)"
   if ip and port then 
@@ -266,7 +282,7 @@ function start (this, client)                     -- allow colon or dot notation
       count = 0,
   }
   local STATUS = {                                -- sundry operating stats, including errors
-      VERSION = _VERSION,
+      VERSION = ABOUT.VERSION,
       ip = myIP (),
       http = httpstats,
       udp = stats,

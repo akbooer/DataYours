@@ -1,5 +1,29 @@
 module ("L_DataCache", package.seeall)
 
+local ABOUT = {
+  NAME            = "DataCache";
+  VERSION         = "2016.10.04";
+  DESCRIPTION     = "DataCache - Carbon Cache daemon";
+  AUTHOR          = "@akbooer";
+  COPYRIGHT       = "(c) 2013-2016 AKBooer";
+  DOCUMENTATION   = "",
+  LICENSE       = [[
+  Copyright 2016 AK Booer
+
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+]]
+}
+
 ------------------------------------------------------------------------
 --
 -- DataCache: data collection back-end using Whisper
@@ -12,21 +36,6 @@ module ("L_DataCache", package.seeall)
 local DataDaemon = require "L_DataDaemon"
 local whisper    = require "L_DataWhisper"
 
-
-local function method () error ("undeclared interface element", 2) end
-local function interface (i) return setmetatable (i, {__newindex = method}) end
-
-
---local DataCache = interface {
-  -- functions
-  init              = method;       -- entry point
-  -- info
-  _AUTHOR           = "@akbooer";
-  _COPYRIGHT        = "(c) 2013-2016 AKBooer";
-  _NAME             = "DataCache";
-  _VERSION          = "2016.01.04";
-  _DESCRIPTION      = "DataCache - Carbon cache daemon";
---}
 
 local daemon                    -- the daemon object with useful methods
 local syslog                    -- syslog socket for logging data
@@ -129,6 +138,7 @@ end
 -- 
 
 local function UDPhandler (msg, ip) -- update whisper file, creating new file if necessary
+  local _ = ip      -- unused at present
   local filename, path, value, timestamp
   local function create () 
     local logMessage1 = "created: %s"
@@ -194,7 +204,7 @@ function init ()
   pre, post = load_rewrite_rules (ROOT .. "rewrite-rules.conf")
   rules = {pre = pre, post = post, rewrites = {}}
   config.DATACACHE = {
-    VERSION = _VERSION, 
+    VERSION = ABOUT.VERSION, 
     whisper = ROOT, 
     stats = stats, 
     tally = tally, 

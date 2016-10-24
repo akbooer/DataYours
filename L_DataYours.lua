@@ -1,20 +1,38 @@
+ABOUT = {
+  NAME            = "DataYours";
+  VERSION         = "2016.10.04";
+  DESCRIPTION     = "DataYours - parent device for Carbon daemons";
+  AUTHOR          = "@akbooer";
+  COPYRIGHT       = "(c) 2013-2016 AKBooer";
+  DOCUMENTATION   = "",
+  LICENSE         = [[
+  Copyright 2016 AK Booer
+
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+]]
+}
 ------------------------------------------------------------------------
 --
 -- DataYours - a simple device front-end for the DataDaemons 
 --
 
 -- 2015-12-15   new version - no child devices
-
+-- 2016-04-11   add LINE_RECEIVER_PORT to relay parameters
+-- 2016-04-14   add DATAMINE_DIR to graph parameters
+-- 2016.07.02   add new WebAPI module reference (to replace DataGraph in future)
 
 local DataDaemon = require "L_DataDaemon"
 local lfs        = require "lfs"
-
--- info
-_AUTHOR         = "@akbooer"
-_COPYRIGHT      = "(c) 2015,2016"
-_VERSION        = "2016.01.04"
-_DESCRIPTION    = "DataYours parent device for Carbon daemons"
-
 
 -- thanks to @amg0 for ALTUI update
 local ALTUI = {   -- generic display variables 
@@ -22,7 +40,6 @@ local ALTUI = {   -- generic display variables
   var1 = "DisplayLine1",
   var2 = "DisplayLine2",
 }
-
 
 local DataYoursSID = "urn:akbooer-com:serviceId:DataYours1"
 
@@ -36,6 +53,7 @@ local icon = "ICON_PATH"              -- URL path to icons (ie. without /www/ ro
 local mem  = "MEMORY_STATS"           -- relay system memory info
 local sys  = "SYSLOG"                 -- relay data to syslog
 local udp  = "UDP_RECEIVER_PORT"      -- Cache listens on this port (for UDP)
+local line = "LINE_RECEIVER_PORT"     -- relay listens on this port (for UDP)
 local vera = "VERAS"                  -- list of remote Veras
 
 local function log (message)
@@ -150,7 +168,12 @@ function Startup ()
   
   -- get configuration parameters from device variables  
   
-  setVar ('Version', _VERSION)              -- code version number
+  do -- version number
+    local y,m,d = ABOUT.VERSION:match "(%d+)%D+(%d+)%D+(%d+)"
+    local version = ("%d.%d.%d"): format (y%2000,m,d)
+    setVar ('Version', version)
+  end
+  
   setVar ('StartTime', os.date())
   setVar (ALTUI.var1, "no services", ALTUI.srv)
   setVar (ALTUI.var2, "no database", ALTUI.srv)
@@ -164,6 +187,7 @@ function Startup ()
     [dir]  = uiVar (dir,  ""),                      -- location of the Whisper database (eg. /nas/whisper/)
     [erg]  = uiVar (erg,  ''),                      -- relay energy usage if "1"
     [icon] = uiVar (icon, "/cmh/skins/default/img/devices/device_states/"),
+    [line] = uiVar (line, ''),                      -- relay UDP listener port
     [mem]  = uiVar (mem,  ''),                      -- relay system memory usage
     [sys]  = uiVar (sys,  ''),                      -- relay data to syslog, eg. "172.16.42.112:514"
     [udp]  = uiVar (udp,  "2003"),                  -- Cache listens on this port (for UDP)
@@ -178,9 +202,9 @@ function Startup ()
   end
   
   DataDaemon.set_config {                 -- override the carbon config with these sections
-    relay = select {sys, dest, erg, mem},
+    relay = select {sys, dest, erg, mem, line},
     cache = select {udp, dir},
-    graph = select {dir},
+    graph = select {dir, dm},
     dash  = select {vera, dir, dm, icon},
     mine  = select {dm},
   }
@@ -197,7 +221,7 @@ function Startup ()
   log "...startup complete"
   if dlist: match "%S+" then setVar (ALTUI.var1, dlist, ALTUI.srv) end
   set_failure (0)                             -- 0 = OK, 1 = authorization fail, 2 = fatal error
-  return true, "DataYours", "OK"
+  return true, "OK", ABOUT.NAME
 end
 
 

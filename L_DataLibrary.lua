@@ -1,5 +1,29 @@
 module ("L_DataLibrary", package.seeall)
 
+ABOUT = {
+  NAME            = "DataLibrary";
+  VERSION         = "2016.07.01";
+  DESCRIPTION     = "contains: cli, gviz, json";
+  AUTHOR          = "@akbooer";
+  COPYRIGHT       = "(c) 2013-2016 AKBooer";
+  DOCUMENTATION   = "",
+  LICENSE       = [[
+  Copyright 2016 AK Booer
+
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+]]
+}
+
 ------
 --
 -- L_DataLibrary (was dmDBserver2) - supplementary modules:
@@ -8,16 +32,6 @@ module ("L_DataLibrary", package.seeall)
 --    json = JSON encode/decode
 --
 
-
-local function method () error ("undeclared interface element", 2) end
-local function interface (i) return setmetatable (i, {__newindex = method}) end
-
-
---local DataLibrary = interface {
-  cli   = method;   -- Command Line Interface parser - for HTTP request handlers.
-  gviz  = method;   -- an API to a subset of the google.visualization javascript library.
-  json  = method;   -- JSON encode/decode with full functionality including unicode UTF-8.
---}
 
 ------
 --
@@ -141,7 +155,9 @@ function gviz ()
 -- see: https://google-developers.appspot.com/chart/interactive/docs/index
 -- 
 
-local version = "2014.04.38  @akbooer"
+-- 2016.07.01   Google Charts API changes broke old code!
+
+local version = "2016.07.01  @akbooer"
 
 local key
 local quote, equote, nowt = "'", '', 'null' 
@@ -257,37 +273,34 @@ local function JavaScript(S)
 -- ChartWrapper ()
 local function ChartWrapper (this)
   this = this or {}
-  local function draw (extras, head, body)  
+  local function draw (extras)  
+    extras = extras or ''
     local t = os.clock ()       
     local id   = this.containerId  or "gVizDiv"
     local opts = {options = this.options or {}, chartType = this.chartType, containerId = id}
-    body = body or table.concat {'<div id="', id, '"></div>'}
-    head = head or ''
-    extras = extras or ''
+
     local html = JavaScript {[[
-    <!DOCTYPE html>
-    <html>
-      <head>
-        <meta charset="utf-8" />
-        <script type="text/javascript" src="https://www.google.com/jsapi"></script>
-        <script type="text/javascript">
-          google.load('visualization','1');
-          google.setOnLoadCallback(gViz);
-          function gViz() {
-              var w = new google.visualization.ChartWrapper(]], toJScr (opts), [[);
-              var data = new google.visualization.DataTable(]], this.dataTable.toJScr, [[);
-              w.setDataTable(data);
-              w.draw();]],
-              extras, [[
-            }
-        </script>
-       ]], head, [[
-      </head>
-      <body>]],
-        body,
-      [[</body>
-    </html>
-    ]]}
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
+    <script type="text/javascript" src="https://www.google.com/jsapi"></script>
+    <script type="text/javascript">
+      google.charts.load('current', {'packages':['corechart', 'table', 'treemap']});
+      google.charts.setOnLoadCallback(gViz);
+      function gViz() {
+          var w = new google.visualization.ChartWrapper(]], toJScr (opts), [[);
+          var data = new google.visualization.DataTable(]], this.dataTable.toJScr, [[);
+          w.setDataTable(data);
+          w.draw();]],
+          extras, [[
+        }
+    </script>
+  </head>
+  <body><div id=]], toJScr(id), [[></div></body>
+</html>
+]]}
     t = (os.clock() - t) * 1e3
     if luup then luup.log (
       ("visualization: %s(%dx%d) %dkB in %dmS"): format (this.chartType,  
