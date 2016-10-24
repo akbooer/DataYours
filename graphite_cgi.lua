@@ -4,7 +4,7 @@ module(..., package.seeall)
 
 ABOUT = {
   NAME          = "graphite_cgi",
-  VERSION       = "2016.10.10",
+  VERSION       = "2016.10.24",
   DESCRIPTION   = "Graphite",
   AUTHOR        = "@akbooer",
   COPYRIGHT     = "(c) 2013-2016 AKBooer",
@@ -28,6 +28,7 @@ ABOUT = {
 
 -- 2016.10.10  check for blank Whisper or dataMine directories in storage_find
 -- 2016.10.20  add context parameter to treejson response (thanks @ronluna)
+-- 2016.10.24  ensure DataYours instance is the LOCAL one!!
 
 -- CGI implementation of Graphite API
 local url     = require "socket.url"
@@ -515,7 +516,8 @@ local function find_whisper_database ()
   }
   local LOCAL_DATA_DIR, DATAMINE_DIR
   for i,d in pairs (luup.devices) do
-    if d.device_type == dy.type then
+    if d.device_type == dy.type 
+    and d.device_num_parent == 0 then  -- 2016.10.24
       LOCAL_DATA_DIR = luup.variable_get (dy.sid, "LOCAL_DATA_DIR", i)
       DATAMINE_DIR = luup.variable_get (dy.sid, "DATAMINE_DIR", i)
       break
