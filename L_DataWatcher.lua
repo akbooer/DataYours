@@ -2,13 +2,13 @@ module ("L_DataWatcher", package.seeall)
 
 local ABOUT = {
   NAME            = "DataWatcher";
-  VERSION         = "2016.10.04";
+  VERSION         = "2017.04.17";
   DESCRIPTION     = "DataWatcher - Carbon Relay daemon";
   AUTHOR          = "@akbooer";
-  COPYRIGHT       = "(c) 2013-2016 AKBooer";
+  COPYRIGHT       = "(c) 2013-2017 AKBooer";
   DOCUMENTATION   = "",
   LICENSE         = [[
-  Copyright 2016 AK Booer
+  Copyright 2013-2017 AK Booer
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -40,6 +40,8 @@ local ABOUT = {
 -- 2016.04.07   add user-defined processing to filter outgoing metric values
 -- 2016.04.08   add LINE_RECEIVER_PORT for incoming UDP Whisper plaintext messages to relay to DESTINATIONS
 --              test with Linux command: nc -u 127.0.0.1 2013 and plaintext message: foo.garp.bung 42
+
+-- 2017.04.17   include symbolic value translation in AltUI HTTP relay handler (thanks @jswim788)
 --
 
 local DataDaemon = require "L_DataDaemon"
@@ -224,13 +226,24 @@ end
 ---- HTTP relay with AltUI Data Storage Provider functionality
 function _G.HTTP_DataWatcherRelay (_,x) 
   local tag = x.target      -- supplied target name overrides device.serviceId.variable syntax
+  local dev = x.lul_device or ''
+  local srv = x.lul_service or ''
+  local var = x.lul_variable or ''
+  local new = x.new or ''
+  --
   if not tag then           -- ...we have to work out what it is
-    local sysNo, devNo = (x.lul_device or ''): match "(%d+)%-(%d+)"
+    local sysNo, devNo = dev: match "(%d+)%-(%d+)"
     if sysNo == "0" then    -- limit to local devices for the moment (because Vera id needs to be right)
-      tag = veraSeries (tonumber(devNo), x.lul_service, x.lul_variable)
+      tag = veraSeries (tonumber(devNo), srv, var)
     end
   end
-  relay_message (tag or '?', x.new, x.lastupdate)
+  -- 2017.04.17  add symbolic value lookup
+  local wildtag = table.concat ({'*', srv, var}, '.')     --  ALL devices (ie. "*", not "%d+")
+  if translate[wildtag] then
+    new = translate[wildtag][new] or 'unknown'
+  end
+  --
+  relay_message (tag or '?', new, x.lastupdate)
   relayed[tag] = (relayed[tag] or 0) + 1   -- keep tally
   return "OK", "text/plain"
 end
