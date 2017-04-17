@@ -1,12 +1,12 @@
 ABOUT = {
   NAME            = "DataYours";
-  VERSION         = "2016.10.04";
+  VERSION         = "2017.04.17";
   DESCRIPTION     = "DataYours - parent device for Carbon daemons";
   AUTHOR          = "@akbooer";
-  COPYRIGHT       = "(c) 2013-2016 AKBooer";
+  COPYRIGHT       = "(c) 2013-2017 AKBooer";
   DOCUMENTATION   = "",
   LICENSE         = [[
-  Copyright 2016 AK Booer
+  Copyright 2013-2017 AK Booer
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
