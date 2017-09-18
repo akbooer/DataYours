@@ -2,7 +2,7 @@ module ("L_DataWatcher", package.seeall)
 
 local ABOUT = {
   NAME            = "DataWatcher";
-  VERSION         = "2017.04.17";
+  VERSION         = "2017.09.18";
   DESCRIPTION     = "DataWatcher - Carbon Relay daemon";
   AUTHOR          = "@akbooer";
   COPYRIGHT       = "(c) 2013-2017 AKBooer";
@@ -42,6 +42,7 @@ local ABOUT = {
 --              test with Linux command: nc -u 127.0.0.1 2013 and plaintext message: foo.garp.bung 42
 
 -- 2017.04.17   include symbolic value translation in AltUI HTTP relay handler (thanks @jswim788)
+-- 2017.09.18   allow '\s' for blanks in symbolic lookup (thanks @d55m14)
 --
 
 local DataDaemon = require "L_DataDaemon"
@@ -240,7 +241,8 @@ function _G.HTTP_DataWatcherRelay (_,x)
   -- 2017.04.17  add symbolic value lookup
   local wildtag = table.concat ({'*', srv, var}, '.')     --  ALL devices (ie. "*", not "%d+")
   if translate[wildtag] then
-    new = translate[wildtag][new] or 'unknown'
+    local escaped = new: gsub (' ', "\\s");               -- 2017.09.18 allow escaped spaces
+    new = translate[wildtag][escaped] or 'unknown'
   end
   --
   relay_message (tag or '?', new, x.lastupdate)

@@ -1,6 +1,6 @@
 ABOUT = {
   NAME            = "DataYours";
-  VERSION         = "2017.04.17";
+  VERSION         = "2017.09.18";
   DESCRIPTION     = "DataYours - parent device for Carbon daemons";
   AUTHOR          = "@akbooer";
   COPYRIGHT       = "(c) 2013-2017 AKBooer";
