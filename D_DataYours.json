@@ -108,7 +108,7 @@
 					"ControlType": "label",
 					"Label": {
 						"lang_tag": "donate",
-						"text": "<a href='http://0.0.0.0:3480/metrics/index.json' target='_blank'>Graphite metrics index</a>"
+						"text": "<a href='/metrics/index.json' target='_blank'>Graphite metrics index</a>"
 					},
 					"Display": {
 						"Service": "urn:akbooer-com:serviceId:DataYours1",
