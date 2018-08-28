@@ -60,7 +60,7 @@
 					"ControlType": "label",
 					"Label": {
 						"lang_tag": "donate",
-						"text": "<a href='/data_request?id=lr_DataWatcher&show=config' target='_blank'>DataWatcher config</a>"
+						"text": "<a href='/port_3480/data_request?id=lr_DataWatcher&show=config' target='_blank'>DataWatcher config</a>"
 					},
 					"Display": {
 						"Service": "urn:akbooer-com:serviceId:DataYours1",
@@ -76,7 +76,7 @@
 					"ControlType": "label",
 					"Label": {
 						"lang_tag": "donate",
-						"text": "<a href='/data_request?id=lr_DataCache&show=config' target='_blank'>DataCache config</a>"
+						"text": "<a href='/port_3480/data_request?id=lr_DataCache&show=config' target='_blank'>DataCache config</a>"
 					},
 					"Display": {
 						"Service": "urn:akbooer-com:serviceId:DataYours1",
@@ -92,7 +92,7 @@
 					"ControlType": "label",
 					"Label": {
 						"lang_tag": "donate",
-						"text": "<a href='/data_request?id=lr_DataGraph&show=config' target='_blank'>DataGraph config</a>"
+						"text": "<a href='/port_3480/data_request?id=lr_DataGraph&show=config' target='_blank'>DataGraph config</a>"
 					},
 					"Display": {
 						"Service": "urn:akbooer-com:serviceId:DataYours1",
@@ -108,7 +108,7 @@
 					"ControlType": "label",
 					"Label": {
 						"lang_tag": "donate",
-						"text": "<a href='/metrics/index.json' target='_blank'>Graphite metrics index</a>"
+						"text": "<a href='/port_3480/metrics/index.json' target='_blank'>Graphite metrics index</a>"
 					},
 					"Display": {
 						"Service": "urn:akbooer-com:serviceId:DataYours1",
@@ -127,7 +127,7 @@
 					"Display": {
 						"Service": "urn:akbooer-com:serviceId:DataYours1",
 						"Variable": "Version",
-						"Top": 220,
+						"Top": 260,
 						"Left": 50,
 						"Width": 75,
 						"Height": 20
@@ -143,7 +143,23 @@
 						"text": "<a href='https:\/\/www.justgiving.com\/DataYours\/' target='_blank'>If you like this plugin, you could DONATE to Cancer Research UK right here</a>"
 					},
 					"Display": {
-						"Top": 240,
+						"Top": 280,
+						"Left": 50,
+						"Width": 75,
+						"Height": 20
+					}
+				},
+				{
+					"ControlGroup":"3",
+					"ControlType": "label",
+					"top": "4",
+					"left": "0",
+					"Label": {
+						"lang_tag": "dashboard",
+						"text": "<a href='/port_3480/data_request?id=lr_dashboard' target='_blank'>DataYours DASHBOARD</a>"
+					},
+					"Display": {
+						"Top": 220,
 						"Left": 50,
 						"Width": 75,
 						"Height": 20

@@ -1,12 +1,12 @@
 ABOUT = {
   NAME            = "DataYours";
-  VERSION         = "2017.09.18";
+  VERSION         = "2018.08.28";
   DESCRIPTION     = "DataYours - parent device for Carbon daemons";
   AUTHOR          = "@akbooer";
-  COPYRIGHT       = "(c) 2013-2017 AKBooer";
+  COPYRIGHT       = "(c) 2013-2018 AKBooer";
   DOCUMENTATION   = "",
   LICENSE         = [[
-  Copyright 2013-2017 AK Booer
+  Copyright 2013-2018 AK Booer
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -30,6 +30,9 @@ ABOUT = {
 -- 2016-04-11   add LINE_RECEIVER_PORT to relay parameters
 -- 2016-04-14   add DATAMINE_DIR to graph parameters
 -- 2016.07.02   add new WebAPI module reference (to replace DataGraph in future)
+
+-- 2018.08.28   update links in D_DataYours.json file to include /port_3480
+
 
 local DataDaemon = require "L_DataDaemon"
 local lfs        = require "lfs"
